@@ -13,8 +13,15 @@ import * as reconcileController from './controllers/reconcileController.js';
 const app = express();
 const PORT = process.env.PORT || 3001;
 
-// Middleware
-app.use(cors());
+// CORS Configuration
+const corsOrigins = process.env.CORS_ORIGINS
+    ? process.env.CORS_ORIGINS.split(',')
+    : ['http://localhost:5173', 'http://localhost:3000'];
+
+app.use(cors({
+    origin: corsOrigins,
+    credentials: true
+}));
 app.use(express.json());
 
 // File upload configuration
