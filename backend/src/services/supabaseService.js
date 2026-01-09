@@ -86,8 +86,16 @@ export async function getReturnCharges() {
 // ============ RECONCILIATION RESULTS ============
 
 export async function saveReconciliationResults(results) {
-    // Clear existing results first
-    await supabase.from('reconciliation_results').delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    if (results.length === 0) return { success: true, count: 0 };
+
+    // Get the period from the first result
+    const period = results[0]?.period;
+
+    if (period) {
+        // Delete only records for this specific period (allows historical data to coexist)
+        await supabase.from('reconciliation_results').delete().eq('period', period);
+
+    }
 
     // Insert in batches of 500 to avoid size limits
     const batchSize = 500;
@@ -100,7 +108,7 @@ export async function saveReconciliationResults(results) {
     return { success: true, count: results.length };
 }
 
-export async function getReconciliationResults(page = 1, pageSize = 50, statusFilter = null) {
+export async function getReconciliationResults(page = 1, pageSize = 50, statusFilter = null, period = null) {
     const from = (page - 1) * pageSize;
     const to = from + pageSize - 1;
 
@@ -114,46 +122,84 @@ export async function getReconciliationResults(page = 1, pageSize = 50, statusFi
         query = query.eq('item_status', statusFilter);
     }
 
+    if (period) {
+        query = query.eq('period', period);
+    }
+
     const { data, error, count } = await query;
     if (error) { console.error('Error fetching reconciliation results:', error); throw error; }
     return { data: data || [], count };
 }
 
-export async function getReconciliationSummary() {
+// Get list of available periods (for dropdown)
+export async function getAvailablePeriods() {
     const { data, error } = await supabase
         .from('reconciliation_results')
-        .select('item_status, reconciliation_status, customer_paid_amount, net_settlement, difference');
+        .select('period')
+        .order('period', { ascending: false });
 
-    if (error) { console.error('Error fetching summary:', error); throw error; }
+    if (error) { console.error('Error fetching periods:', error); throw error; }
 
-    const summary = {
-        totalOrders: 0,
-        delivered: 0,
-        cancelled: 0,
-        returned: 0,
-        rto: 0,
-        inTransit: 0,
-        miscellaneous: 0,
-        totalCustomerPaid: 0,
-        totalSettled: 0,
-        totalDifference: 0
-    };
+    // Get unique periods
+    const periods = [...new Set((data || []).map(d => d.period).filter(Boolean))];
+    return periods;
+}
 
-    (data || []).forEach(row => {
-        summary.totalOrders++;
-        if (row.item_status === 'Delivered') summary.delivered++;
-        else if (row.item_status === 'Cancelled') summary.cancelled++;
-        else if (row.item_status === 'Returned') summary.returned++;
-        else if (row.item_status === 'RTO') summary.rto++;
-        else if (row.item_status === 'In Transit') summary.inTransit++;
-        else if (row.item_status === 'Miscellaneous') summary.miscellaneous++;
+export async function getReconciliationSummary(period = null) {
+    const maxRetries = 3;
+    let attempt = 0;
 
-        summary.totalCustomerPaid += Number(row.customer_paid_amount) || 0;
-        summary.totalSettled += Number(row.net_settlement) || 0;
-        summary.totalDifference += Number(row.difference) || 0;
-    });
+    while (attempt < maxRetries) {
+        try {
+            let query = supabase
+                .from('reconciliation_results')
+                .select('item_status, reconciliation_status, customer_paid_amount, net_settlement, difference');
 
-    return summary;
+            if (period) {
+                query = query.eq('period', period);
+            }
+
+            const { data, error } = await query;
+
+            if (error) throw error;
+
+            const summary = {
+                totalOrders: 0,
+                delivered: 0,
+                cancelled: 0,
+                returned: 0,
+                rto: 0,
+                inTransit: 0,
+                miscellaneous: 0,
+                totalCustomerPaid: 0,
+                totalSettled: 0,
+                totalDifference: 0
+            };
+
+            (data || []).forEach(row => {
+                summary.totalOrders++;
+                if (row.item_status === 'Delivered') summary.delivered++;
+                else if (row.item_status === 'Cancelled') summary.cancelled++;
+                else if (row.item_status === 'Returned') summary.returned++;
+                else if (row.item_status === 'RTO') summary.rto++;
+                else if (row.item_status === 'In Transit') summary.inTransit++;
+                else if (row.item_status === 'Miscellaneous') summary.miscellaneous++;
+
+                summary.totalCustomerPaid += Number(row.customer_paid_amount) || 0;
+                summary.totalSettled += Number(row.net_settlement) || 0;
+                summary.totalDifference += Number(row.difference) || 0;
+            });
+
+            return summary;
+
+        } catch (error) {
+            console.error(`Error fetching summary (Attempt ${attempt + 1}/${maxRetries}):`, error.message);
+            attempt++;
+            if (attempt === maxRetries) throw error;
+            // Wait before retrying (exponential backoff: 1s, 2s, 3s)
+            await new Promise(resolve => setTimeout(resolve, attempt * 1000));
+        }
+    }
 }
 
 export async function getTableCounts() {

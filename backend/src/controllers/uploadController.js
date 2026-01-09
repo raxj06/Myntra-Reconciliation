@@ -17,7 +17,7 @@ async function safeParse(csvContent) {
         const rows = await parseCSV(csvContent);
         if (rows.length > 0) return rows;
     } catch (error) {
-        console.log('Main parser failed, trying simple parser:', error.message);
+
     }
 
     // Fallback to simple parser
@@ -47,7 +47,7 @@ export async function uploadOrders(req, res) {
             return res.status(400).json({ error: 'CSV file is empty or could not be parsed' });
         }
 
-        console.log(`Parsed ${rawRows.length} rows from Order CSV`);
+
 
         // Normalize using field mapper
         const normalizedRows = normalizeRows(rawRows, ORDER_FIELD_MAP);
@@ -82,7 +82,7 @@ export async function uploadCancellations(req, res) {
             return res.status(400).json({ error: 'CSV file is empty or could not be parsed' });
         }
 
-        console.log(`Parsed ${rawRows.length} rows from Cancel CSV`);
+
 
         // Normalize using field mapper
         const normalizedRows = normalizeRows(rawRows, CANCELLATION_FIELD_MAP);
@@ -117,7 +117,7 @@ export async function uploadReturns(req, res) {
             return res.status(400).json({ error: 'CSV file is empty or could not be parsed' });
         }
 
-        console.log(`Parsed ${rawRows.length} rows from Return CSV`);
+
 
         // Normalize using field mapper
         const normalizedRows = normalizeRows(rawRows, RETURN_FIELD_MAP);
@@ -152,7 +152,7 @@ export async function uploadReturnCharges(req, res) {
             return res.status(400).json({ error: 'CSV file is empty or could not be parsed' });
         }
 
-        console.log(`Parsed ${rawRows.length} rows from Return Charge CSV`);
+
 
         // Normalize using field mapper
         const normalizedRows = normalizeRows(rawRows, RETURN_PAYMENT_FIELD_MAP);
@@ -187,7 +187,7 @@ export async function uploadPayments(req, res) {
             return res.status(400).json({ error: 'CSV file is empty or could not be parsed' });
         }
 
-        console.log(`Parsed ${rawRows.length} rows from Payment CSV`);
+
 
         // Normalize using field mapper
         const normalizedRows = normalizeRows(rawRows, PAYMENT_FIELD_MAP);

@@ -13,32 +13,34 @@ import * as supabaseService from '../services/supabaseService.js';
  * - Return charges are NEGATIVE values (deducted from settlement)
  */
 
-export async function runReconciliation() {
-    console.log('Starting reconciliation...');
+export async function runReconciliation(period = null) {
+    // Default to current month if no period specified
+    const reconciliationPeriod = period || new Date().toISOString().slice(0, 7); // YYYY-MM
+
 
     // 1. Get all orders
     const orders = await supabaseService.getOrders();
-    console.log(`Found ${orders.length} orders`);
+
 
     // 2. Get all cancellations (by order_line_id)
     const cancellations = await supabaseService.getCancellations();
     const cancelledIds = new Set(cancellations.map(c => c.order_line_id));
-    console.log(`Found ${cancellations.length} cancellations`);
+
 
     // 3. Get all returns
     const returns = await supabaseService.getReturns();
     const returnedIds = new Set(returns.map(r => r.order_line_id));
-    console.log(`Found ${returns.length} returns`);
+
 
     // 4. Get all payments
     const payments = await supabaseService.getPayments();
     const paymentMap = new Map(payments.map(p => [p.order_line_id, p]));
-    console.log(`Found ${payments.length} payments`);
+
 
     // 5. Get all return charges
     const returnCharges = await supabaseService.getReturnCharges();
     const returnChargeMap = new Map(returnCharges.map(r => [r.order_line_id, r]));
-    console.log(`Found ${returnCharges.length} return charges`);
+
 
     // 6. Process each order
     const results = orders.map(order => {
@@ -49,20 +51,7 @@ export async function runReconciliation() {
         const isInPaymentSheet = paymentMap.has(order.order_line_id);
         const isInReturnChargeSheet = returnChargeMap.has(order.order_line_id);
 
-        // Debug specific order
-        if (order.order_line_id === '10757976718' || order.order_line_id === '10736693301') {
-            console.log(`DEBUG Order ${order.order_line_id}:`, {
-                order_status: order.order_status,
-                hasPayment,
-                hasReturnCharge,
-                isInPaymentSheet,
-                isInReturnChargeSheet,
-                isInCancellations: cancelledIds.has(order.order_line_id),
-                isInReturns: returnedIds.has(order.order_line_id),
-                payment: payment || 'NOT FOUND',
-                returnCharge: returnCharge || 'NOT FOUND'
-            });
-        }
+
 
         // Determine status based on multiple criteria
         let itemStatus;
@@ -204,7 +193,8 @@ export async function runReconciliation() {
             net_settlement: netSettlement,
             difference: difference,
             customer_difference: customerDifference,
-            reconciliation_status: reconStatus
+            reconciliation_status: reconStatus,
+            period: reconciliationPeriod
         };
     });
 
@@ -213,9 +203,9 @@ export async function runReconciliation() {
         acc[r.item_status] = (acc[r.item_status] || 0) + 1;
         return acc;
     }, {});
-    console.log('Status breakdown:', statusCounts);
 
-    console.log(`Processed ${results.length} reconciliation results`);
+
+
 
     // 7. Save results to Supabase
     await supabaseService.saveReconciliationResults(results);

@@ -2,12 +2,23 @@ import { useState, useEffect, useCallback } from 'react';
 import FileUpload from '../components/FileUpload';
 import SummaryCards from '../components/SummaryCards';
 import ReconciliationTable from '../components/ReconciliationTable';
+
+import Sidebar from '../components/Sidebar';
+import SuccessModal from '../components/SuccessModal';
 import * as api from '../services/api';
 
 /**
  * Main Dashboard Page - Myntra Reconciliation V2
  */
 function Dashboard() {
+    // Period state
+    const [selectedPeriod, setSelectedPeriod] = useState(null);
+    const [periodLabel, setPeriodLabel] = useState('All Periods');
+
+    // Modal state
+    const [modalOpen, setModalOpen] = useState(false);
+    const [modalContent, setModalContent] = useState({ title: '', message: '' });
+
     // Upload states
     const [uploadCounts, setUploadCounts] = useState({
         orders: 0,
@@ -45,6 +56,18 @@ function Dashboard() {
     // UI states
     const [reconciling, setReconciling] = useState(false);
     const [toasts, setToasts] = useState([]);
+    const [sidebarOpen, setSidebarOpen] = useState(true);
+
+    // Format period for display
+    const formatPeriodLabel = (period) => {
+        if (!period) return 'All Periods';
+        const [year, month] = period.split('-');
+        const monthNames = [
+            'January', 'February', 'March', 'April', 'May', 'June',
+            'July', 'August', 'September', 'October', 'November', 'December'
+        ];
+        return `${monthNames[parseInt(month) - 1]} ${year}`;
+    };
 
     // Toast helper
     const showToast = (message, type = 'success') => {
@@ -55,30 +78,43 @@ function Dashboard() {
         }, 4000);
     };
 
+    // Show Modal Helper
+    const showSuccessModal = (title, message) => {
+        setModalContent({ title, message });
+        setModalOpen(true);
+    };
+
     // Load initial data
     const loadData = useCallback(async () => {
         try {
             const [status, summaryData] = await Promise.all([
                 api.getUploadStatus(),
-                api.getSummary()
+                api.getSummary(selectedPeriod)
             ]);
             setUploadCounts(status);
             setSummary(summaryData);
         } catch (error) {
             console.error('Error loading data:', error);
         }
-    }, []);
+    }, [selectedPeriod]);
 
     useEffect(() => {
         loadData();
     }, [loadData]);
+
+    // Handle period change
+    const handlePeriodChange = (period) => {
+        setSelectedPeriod(period);
+        setPeriodLabel(formatPeriodLabel(period));
+        setRefreshTrigger(prev => prev + 1);
+    };
 
     // Upload handlers
     const handleOrderUpload = async (file) => {
         setUploading(prev => ({ ...prev, orders: true }));
         try {
             const result = await api.uploadOrderCSV(file);
-            showToast(`${result.count} orders uploaded`);
+            showSuccessModal('Orders Uploaded!', `${result.count} orders successfully added.`);
             await loadData();
         } catch (error) {
             showToast(error.message, 'error');
@@ -90,7 +126,7 @@ function Dashboard() {
         setUploading(prev => ({ ...prev, cancel: true }));
         try {
             const result = await api.uploadCancelCSV(file);
-            showToast(`${result.count} cancellations uploaded`);
+            showSuccessModal('Cancellations Uploaded!', `${result.count} cancellations successfully added.`);
             await loadData();
         } catch (error) {
             showToast(error.message, 'error');
@@ -102,7 +138,7 @@ function Dashboard() {
         setUploading(prev => ({ ...prev, returns: true }));
         try {
             const result = await api.uploadReturnCSV(file);
-            showToast(`${result.count} returns uploaded`);
+            showSuccessModal('Returns Uploaded!', `${result.count} returns successfully added.`);
             await loadData();
         } catch (error) {
             showToast(error.message, 'error');
@@ -114,7 +150,7 @@ function Dashboard() {
         setUploading(prev => ({ ...prev, returnCharge: true }));
         try {
             const result = await api.uploadReturnChargeCSV(file);
-            showToast(`${result.count} return charges uploaded`);
+            showSuccessModal('Return Charges Uploaded!', `${result.count} return charges successfully added.`);
             await loadData();
         } catch (error) {
             showToast(error.message, 'error');
@@ -126,7 +162,7 @@ function Dashboard() {
         setUploading(prev => ({ ...prev, payment: true }));
         try {
             const result = await api.uploadPaymentCSV(file);
-            showToast(`${result.count} payments uploaded`);
+            showSuccessModal('Payments Uploaded!', `${result.count} payments successfully added.`);
             await loadData();
         } catch (error) {
             showToast(error.message, 'error');
@@ -138,10 +174,14 @@ function Dashboard() {
     const handleReconcile = async () => {
         setReconciling(true);
         try {
-            const result = await api.runReconciliation();
-            showToast(`Reconciliation complete! ${result.count} items processed.`);
+            // Use selected period or current month
+            const period = selectedPeriod || new Date().toISOString().slice(0, 7);
+            const result = await api.runReconciliation(period);
+            showToast(`Reconciliation complete for ${formatPeriodLabel(period)}! ${result.count} items processed.`);
+            setSelectedPeriod(period);
+            setPeriodLabel(formatPeriodLabel(period));
             await loadData();
-            setRefreshTrigger(prev => prev + 1); // Trigger table refresh
+            setRefreshTrigger(prev => prev + 1);
         } catch (error) {
             showToast(error.message, 'error');
         }
@@ -151,7 +191,7 @@ function Dashboard() {
     // Export handler
     const handleExport = async () => {
         try {
-            await api.exportExcel();
+            await api.exportExcel(selectedPeriod);
             showToast('Excel report downloaded!');
         } catch (error) {
             showToast(error.message, 'error');
@@ -176,111 +216,129 @@ function Dashboard() {
     const handleFilterChange = (filter) => {
         setStatusFilter(filter);
     };
-
     const hasData = uploadCounts.orders > 0;
     const hasResults = summary.totalOrders > 0;
 
     return (
-        <div className="app-container">
-            <div className="dashboard">
-                {/* Header */}
-                <header className="header">
-                    <h1>
-                        <img src="/logo.png" alt="Myntra" className="logo-img" />
-                        Myntra Reconciliation
-                    </h1>
-                    <div className="header-actions">
-                        <button
-                            className="btn btn-primary"
-                            onClick={handleReconcile}
-                            disabled={!hasData || reconciling}
-                        >
-                            {reconciling ? '⏳ Processing...' : '🔄 Run Reconciliation'}
-                        </button>
-                        <button
-                            className="btn btn-success"
-                            onClick={handleExport}
-                            disabled={!hasResults}
-                        >
-                            📥 Export Excel
-                        </button>
-                        <button
-                            className="btn btn-danger"
-                            onClick={handleClear}
-                            disabled={!hasData}
-                        >
-                            🗑️ Clear
-                        </button>
-                    </div>
-                </header>
+        <div className="app-layout">
+            {/* Sidebar RESTORED */}
+            <Sidebar
+                selectedPeriod={selectedPeriod}
+                onPeriodChange={handlePeriodChange}
+                onNewPeriod={handlePeriodChange}
+            />
 
-                {/* Upload Section */}
-                <section className="upload-section">
-                    <div className="card-title">Upload CSV Files</div>
-                    <div className="upload-grid">
-                        <FileUpload
-                            title="Order CSV"
-                            description="ORDER.csv"
-                            icon="📦"
-                            onUpload={handleOrderUpload}
-                            uploadedCount={uploadCounts.orders}
-                            loading={uploading.orders}
-                        />
-                        <FileUpload
-                            title="Cancel CSV"
-                            description="CANCEL.csv"
-                            icon="❌"
-                            onUpload={handleCancelUpload}
-                            uploadedCount={uploadCounts.cancellations}
-                            loading={uploading.cancel}
-                        />
-                        <FileUpload
-                            title="Return CSV"
-                            description="RETURN.csv"
-                            icon="↩️"
-                            onUpload={handleReturnUpload}
-                            uploadedCount={uploadCounts.returns}
-                            loading={uploading.returns}
-                        />
-                        <FileUpload
-                            title="Return Charge CSV"
-                            description="RETURN CHRGE.csv"
-                            icon="💰"
-                            onUpload={handleReturnChargeUpload}
-                            uploadedCount={uploadCounts.return_charges}
-                            loading={uploading.returnCharge}
-                        />
-                        <FileUpload
-                            title="Payment CSV"
-                            description="PAYMENT.csv"
-                            icon="💳"
-                            onUpload={handlePaymentUpload}
-                            uploadedCount={uploadCounts.payments}
-                            loading={uploading.payment}
-                        />
-                    </div>
-                </section>
-
-                {/* Summary Cards - Clickable to filter */}
-                <SummaryCards
-                    summary={summary}
-                    activeFilter={statusFilter}
-                    onFilterChange={handleFilterChange}
-                />
-
-                {/* Reconciliation Table */}
-                <ReconciliationTable
-                    statusFilter={statusFilter}
-                    refreshTrigger={refreshTrigger}
-                />
-
-                {/* Toast Notifications */}
-                <div className="toast-container">
-                    {toasts.map(toast => (
-                        <div key={toast.id} className={`toast ${toast.type}`}>
-                            {toast.type === 'success' ? '✓' : '✕'} {toast.message}
+            <div className="app-container">
+                <div className="dashboard">
+                    {/* Header with Month Selector */}
+                    <header className="header">
+                        <div className="header-left">
+                            <h1>
+                                <img src="/logo.png" alt="Myntra" className="logo-img" />
+                                Myntra Reconciliation
+                            </h1>
+                            <div className="period-selector">
+                                <input
+                                    type="month"
+                                    className="date-input"
+                                    value={selectedPeriod || ''} // Handle null value
+                                    onChange={(e) => {
+                                        const val = e.target.value;
+                                        if (val) handlePeriodChange(val);
+                                        else handlePeriodChange(null); // Handle clearing
+                                    }}
+                                />
+                            </div>
                         </div>
-                    ))}
+
+                        <div className="header-actions">
+                            <button
+                                className="btn btn-primary"
+                                onClick={handleReconcile}
+                                disabled={!hasData || reconciling}
+                            >
+                                {reconciling ? '⏳ Processing...' : '🔄 Run Reconciliation'}
+                            </button>
+                            <button
+                                className="btn btn-secondary"
+                                onClick={handleExport}
+                                disabled={!hasResults}
+                            >
+                                📥 Export Excel
+                            </button>
+                            <button
+                                className="btn btn-danger"
+                                onClick={handleClear}
+                            >
+                                🗑️ Clear
+                            </button>
+                        </div>
+                    </header>
+
+                    {/* Upload Section */}
+                    <section className="upload-section">
+                        <h2>📁 Upload CSV Files</h2>
+                        <div className="upload-grid">
+                            <FileUpload
+                                label="Order CSV"
+                                count={uploadCounts.orders}
+                                onUpload={handleOrderUpload}
+                                loading={uploading.orders}
+                                accept=".csv"
+                            />
+                            <FileUpload
+                                label="Cancel CSV"
+                                count={uploadCounts.cancellations}
+                                onUpload={handleCancelUpload}
+                                loading={uploading.cancel}
+                                accept=".csv"
+                            />
+                            <FileUpload
+                                label="Return CSV"
+                                count={uploadCounts.returns}
+                                onUpload={handleReturnUpload}
+                                loading={uploading.returns}
+                                accept=".csv"
+                            />
+                            <FileUpload
+                                label="Return Charge CSV"
+                                count={uploadCounts.return_charges}
+                                onUpload={handleReturnChargeUpload}
+                                loading={uploading.returnCharge}
+                                accept=".csv"
+                            />
+                            <FileUpload
+                                label="Payment CSV"
+                                count={uploadCounts.payments}
+                                onUpload={handlePaymentUpload}
+                                loading={uploading.payment}
+                                accept=".csv"
+                            />
+                        </div>
+                    </section>
+
+                    {/* Summary Cards */}
+                    <SummaryCards
+                        summary={summary}
+                        onFilterChange={handleFilterChange}
+                        activeFilter={statusFilter}
+                    />
+
+                    {/* Reconciliation Table */}
+                    <ReconciliationTable
+                        statusFilter={statusFilter}
+                        refreshTrigger={refreshTrigger}
+                        period={selectedPeriod}
+                    />
+
+                    {/* Toast Notifications */}
+                    <div className="toast-container">
+                        {toasts.map(toast => (
+                            <div key={toast.id} className={`toast toast-${toast.type}`}>
+                                {toast.message}
+                            </div>
+                        ))}
+                    </div>
                 </div>
             </div>
         </div>

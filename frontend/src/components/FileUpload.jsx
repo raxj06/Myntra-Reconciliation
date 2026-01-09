@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
  * File Upload Card Component
  * Drag-and-drop enabled CSV upload with custom styled button
  */
-function FileUpload({ title, description, icon, onUpload, uploadedCount, loading }) {
+function FileUpload({ label, count, icon, onUpload, loading, accept }) {
     const [dragover, setDragover] = useState(false);
     const inputRef = useRef(null);
 
@@ -44,8 +44,19 @@ function FileUpload({ title, description, icon, onUpload, uploadedCount, loading
         let cls = 'upload-card';
         if (dragover) cls += ' dragover';
         if (loading) cls += ' uploading';
-        if (uploadedCount > 0) cls += ' success';
+        if (count > 0) cls += ' success';
         return cls;
+    };
+
+    // Determine icon based on label if not provided
+    const getIcon = () => {
+        if (icon) return icon;
+        if (label.includes('Order')) return '📦';
+        if (label.includes('Cancel')) return '❌';
+        if (label.includes('Return Charge')) return '💰';
+        if (label.includes('Return')) return '↩️';
+        if (label.includes('Payment')) return '💳';
+        return '📄';
     };
 
     return (
@@ -56,16 +67,19 @@ function FileUpload({ title, description, icon, onUpload, uploadedCount, loading
             onDragLeave={handleDragLeave}
             onDrop={handleDrop}
         >
-            <div className="upload-icon">{icon}</div>
-            <h4>{title}</h4>
-            <p>{description}</p>
+            <div className="upload-icon">{getIcon()}</div>
+            <h4>{label}</h4>
+            <p className="file-name">{label.toUpperCase().replace(' CSV', '.csv')}</p>
 
             {loading ? (
                 <div className="upload-status uploading-text">
                     <span className="spinner-small"></span> Uploading...
                 </div>
-            ) : uploadedCount > 0 ? (
-                <div className="upload-count">✓ {uploadedCount}</div>
+            ) : count > 0 ? (
+                <div className="upload-success-count">
+                    <span className="checkmark">✓</span>
+                    <span className="count-number">{count}</span>
+                </div>
             ) : (
                 <div className="upload-hint">
                     Drop file or click to browse

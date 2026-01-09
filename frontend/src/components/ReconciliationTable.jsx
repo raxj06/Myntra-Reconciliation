@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { getReconciliationTable } from '../services/api';
 
-const ReconciliationTable = ({ statusFilter = 'All', refreshTrigger = 0 }) => {
+const ReconciliationTable = ({ statusFilter = 'All', refreshTrigger = 0, period = null }) => {
     const [data, setData] = useState([]);
     const [totalCount, setTotalCount] = useState(0);
     const [page, setPage] = useState(1);
@@ -9,21 +9,21 @@ const ReconciliationTable = ({ statusFilter = 'All', refreshTrigger = 0 }) => {
     const [showAll, setShowAll] = useState(false);
     const [loading, setLoading] = useState(false);
 
-    // Reset to page 1 when filter changes
+    // Reset to page 1 when filter or period changes
     useEffect(() => {
         setPage(1);
-    }, [statusFilter]);
+    }, [statusFilter, period]);
 
     useEffect(() => {
         fetchData();
-    }, [page, pageSize, statusFilter, refreshTrigger]);
+    }, [page, pageSize, statusFilter, refreshTrigger, period]);
 
     const fetchData = async () => {
         setLoading(true);
         try {
             // If showAll is true, request with very large page size
             const size = showAll ? 10000 : pageSize;
-            const result = await getReconciliationTable(1, size, statusFilter);
+            const result = await getReconciliationTable(1, size, statusFilter, period);
             setData(result.data || []);
             setTotalCount(result.count || 0);
         } catch (error) {
@@ -32,6 +32,7 @@ const ReconciliationTable = ({ statusFilter = 'All', refreshTrigger = 0 }) => {
             setLoading(false);
         }
     };
+
 
     const handleShowAll = () => {
         setShowAll(true);

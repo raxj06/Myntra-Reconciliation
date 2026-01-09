@@ -103,9 +103,13 @@ export async function getUploadStatus() {
 
 // ============ RECONCILIATION APIs ============
 
-export async function runReconciliation() {
+export async function runReconciliation(period = null) {
     const response = await fetch(`${API_BASE}/reconcile`, {
-        method: 'POST'
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ period })
     });
 
     if (!response.ok) {
@@ -116,8 +120,13 @@ export async function runReconciliation() {
     return response.json();
 }
 
-export async function getSummary() {
-    const response = await fetch(`${API_BASE}/summary`);
+export async function getSummary(period = null) {
+    let url = `${API_BASE}/summary`;
+    if (period) {
+        url += `?period=${encodeURIComponent(period)}`;
+    }
+
+    const response = await fetch(url);
 
     if (!response.ok) {
         throw new Error('Failed to fetch summary');
@@ -126,10 +135,13 @@ export async function getSummary() {
     return response.json();
 }
 
-export async function getReconciliationTable(page = 1, pageSize = 50, status = null) {
+export async function getReconciliationTable(page = 1, pageSize = 50, status = null, period = null) {
     let url = `${API_BASE}/reconciliation-table?page=${page}&pageSize=${pageSize}`;
     if (status) {
         url += `&status=${encodeURIComponent(status)}`;
+    }
+    if (period) {
+        url += `&period=${encodeURIComponent(period)}`;
     }
 
     const response = await fetch(url);
@@ -141,22 +153,37 @@ export async function getReconciliationTable(page = 1, pageSize = 50, status = n
     return response.json();
 }
 
-export async function exportExcel() {
-    const response = await fetch(`${API_BASE}/export/excel`);
+export async function getAvailablePeriods() {
+    const response = await fetch(`${API_BASE}/periods`);
+
+    if (!response.ok) {
+        throw new Error('Failed to fetch periods');
+    }
+
+    return response.json();
+}
+
+export async function exportExcel(period = null) {
+    let url = `${API_BASE}/export/excel`;
+    if (period) {
+        url += `?period=${encodeURIComponent(period)}`;
+    }
+
+    const response = await fetch(url);
 
     if (!response.ok) {
         throw new Error('Failed to export Excel');
     }
 
     const blob = await response.blob();
-    const url = window.URL.createObjectURL(blob);
+    const downloadUrl = window.URL.createObjectURL(blob);
     const a = document.createElement('a');
-    a.href = url;
-    a.download = `myntra_reconciliation_${new Date().toISOString().split('T')[0]}.xlsx`;
+    a.href = downloadUrl;
+    a.download = `myntra_reconciliation_${period || new Date().toISOString().split('T')[0]}.xlsx`;
     document.body.appendChild(a);
     a.click();
     document.body.removeChild(a);
-    window.URL.revokeObjectURL(url);
+    window.URL.revokeObjectURL(downloadUrl);
 }
 
 export async function clearAllData() {

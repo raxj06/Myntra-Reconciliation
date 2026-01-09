@@ -7,12 +7,16 @@ import { generateExcelReport } from '../services/exportService.js';
  */
 export async function reconcile(req, res) {
     try {
-        const { summary } = await runReconciliation();
+        // Get period from request body or use current month
+        const period = req.body.period || new Date().toISOString().slice(0, 7);
+
+        const result = await runReconciliation(period);
 
         res.json({
             success: true,
-            message: 'Reconciliation completed',
-            summary
+            message: `Reconciliation completed for ${period}`,
+            period,
+            ...result
         });
     } catch (error) {
         console.error('Error during reconciliation:', error);
@@ -25,7 +29,8 @@ export async function reconcile(req, res) {
  */
 export async function getSummary(req, res) {
     try {
-        const summary = await supabaseService.getReconciliationSummary();
+        const period = req.query.period || null;
+        const summary = await supabaseService.getReconciliationSummary(period);
         res.json(summary);
     } catch (error) {
         console.error('Error fetching summary:', error);
@@ -41,11 +46,13 @@ export async function getReconciliationTable(req, res) {
         const page = parseInt(req.query.page) || 1;
         const pageSize = parseInt(req.query.pageSize) || 50;
         const status = req.query.status || null;
+        const period = req.query.period || null;
 
-        const { data, count } = await supabaseService.getReconciliationResults(page, pageSize, status);
+        const { data, count } = await supabaseService.getReconciliationResults(page, pageSize, status, period);
 
         res.json({
             data,
+            count,
             pagination: {
                 page,
                 pageSize,
@@ -60,13 +67,27 @@ export async function getReconciliationTable(req, res) {
 }
 
 /**
+ * Get available periods (for dropdown)
+ */
+export async function getAvailablePeriods(req, res) {
+    try {
+        const periods = await supabaseService.getAvailablePeriods();
+        res.json({ periods });
+    } catch (error) {
+        console.error('Error fetching periods:', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
+/**
  * Export reconciliation results to Excel
  */
 export async function exportExcel(req, res) {
     try {
-        const buffer = await generateExcelReport();
+        const period = req.query.period || null;
+        const buffer = await generateExcelReport(period);
 
-        const filename = `myntra_reconciliation_${new Date().toISOString().split('T')[0]}.xlsx`;
+        const filename = `myntra_reconciliation_${period || new Date().toISOString().split('T')[0]}.xlsx`;
 
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);

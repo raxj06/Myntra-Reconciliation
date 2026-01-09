@@ -57,6 +57,7 @@ app.get('/api/upload/status', uploadController.getUploadStatus);
 app.post('/api/reconcile', reconcileController.reconcile);
 app.get('/api/summary', reconcileController.getSummary);
 app.get('/api/reconciliation-table', reconcileController.getReconciliationTable);
+app.get('/api/periods', reconcileController.getAvailablePeriods);
 app.get('/api/export/excel', reconcileController.exportExcel);
 app.delete('/api/clear', reconcileController.clearData);
 

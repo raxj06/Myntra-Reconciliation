@@ -92,13 +92,17 @@ GRANT ALL ON return_charges TO anon;
 -- 6. Reconciliation Results Table (For Dashboard & Export)
 CREATE TABLE IF NOT EXISTS reconciliation_results (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  order_line_id TEXT NOT NULL UNIQUE,
+  order_line_id TEXT NOT NULL,
   order_release_id TEXT,
   sku_code TEXT,
   style_name TEXT,
   
+  -- Period for historical data (format: YYYY-MM)
+  period TEXT NOT NULL DEFAULT '2026-01',
+  
   -- Status
-  item_status TEXT, -- Delivered, Cancelled, Returned, In Transit
+  item_status TEXT, -- Delivered, Cancelled, Returned, RTO, In Transit, Miscellaneous
+  misc_type TEXT, -- 'Return' or 'Delivered' for Miscellaneous orders
   
   -- Amounts
   final_amount DECIMAL(12,2),
@@ -118,7 +122,11 @@ CREATE TABLE IF NOT EXISTS reconciliation_results (
   -- Dates for sorting
   order_date TIMESTAMPTZ,
   
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  
+  -- Unique constraint on order_line_id + period (same order can exist in different periods)
+  UNIQUE(order_line_id, period)
 );
 CREATE INDEX IF NOT EXISTS idx_recon_status ON reconciliation_results(item_status);
+CREATE INDEX IF NOT EXISTS idx_recon_period ON reconciliation_results(period);
 GRANT ALL ON reconciliation_results TO anon;
