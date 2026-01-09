@@ -60,6 +60,7 @@ app.get('/api/reconciliation-table', reconcileController.getReconciliationTable)
 app.get('/api/periods', reconcileController.getAvailablePeriods);
 app.get('/api/export/excel', reconcileController.exportExcel);
 app.delete('/api/clear', reconcileController.clearData);
+app.delete('/api/clear-staging', reconcileController.clearStaging);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

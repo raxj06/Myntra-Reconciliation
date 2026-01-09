@@ -103,9 +103,30 @@ function Dashboard() {
     }, [loadData]);
 
     // Handle period change
-    const handlePeriodChange = (period) => {
+    const handlePeriodChange = async (period) => {
+        // If clicking same period, do nothing
+        if (period === selectedPeriod) return;
+
+        // Reset UI immediately to avoid confusion
         setSelectedPeriod(period);
         setPeriodLabel(formatPeriodLabel(period));
+
+        // Clear staging files from previous session since we are switching context
+        // This ensures the "Upload CSV" section is fresh for the new period
+        try {
+            await api.clearStaging();
+            // Reset upload counts locally
+            setUploadCounts({
+                orders: 0,
+                cancellations: 0,
+                returns: 0,
+                return_charges: 0,
+                payments: 0
+            });
+        } catch (error) {
+            console.error('Failed to clear staging:', error);
+        }
+
         setRefreshTrigger(prev => prev + 1);
     };
 

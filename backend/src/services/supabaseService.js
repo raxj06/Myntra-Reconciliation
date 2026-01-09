@@ -216,6 +216,14 @@ export async function getTableCounts() {
     return counts;
 }
 
+export async function clearStagingData() {
+    const tables = ['orders', 'cancellations', 'returns', 'payments', 'return_charges'];
+    for (const table of tables) {
+        await supabase.from(table).delete().neq('id', '00000000-0000-0000-0000-000000000000');
+    }
+    return { success: true };
+}
+
 export async function clearAllData() {
     const tables = ['reconciliation_results', 'return_charges', 'payments', 'returns', 'cancellations', 'orders'];
     for (const table of tables) {

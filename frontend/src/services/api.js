@@ -186,14 +186,24 @@ export async function exportExcel(period = null) {
     window.URL.revokeObjectURL(downloadUrl);
 }
 
-export async function clearAllData() {
+export const clearAllData = async () => {
     const response = await fetch(`${API_BASE}/clear`, {
-        method: 'DELETE'
+        method: 'DELETE',
     });
-
     if (!response.ok) {
-        throw new Error('Failed to clear data');
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to clear data');
     }
+    return await response.json();
+};
 
-    return response.json();
-}
+export const clearStaging = async () => {
+    const response = await fetch(`${API_BASE}/clear-staging`, {
+        method: 'DELETE',
+    });
+    if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.error || 'Failed to clear staging data');
+    }
+    return await response.json();
+};

@@ -104,9 +104,19 @@ export async function exportExcel(req, res) {
 export async function clearData(req, res) {
     try {
         await supabaseService.clearAllData();
-        res.json({ success: true, message: 'All data cleared' });
+        res.json({ message: 'All data cleared' });
     } catch (error) {
         console.error('Error clearing data:', error);
+        res.status(500).json({ error: error.message });
+    }
+}
+
+export async function clearStaging(req, res) {
+    try {
+        await supabaseService.clearStagingData();
+        res.json({ message: 'Staging data cleared' });
+    } catch (error) {
+        console.error('Error clearing staging data:', error);
         res.status(500).json({ error: error.message });
     }
 }
